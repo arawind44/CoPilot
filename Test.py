@@ -1,25 +1,36 @@
 import pandas as pd
 
-# Load Excel file
-df = pd.read_excel("your_file.xlsx")
+# Step 1: Read the Excel file
+# Replace 'your_file.xlsx' with your actual file path
+df = pd.read_excel('your_file.xlsx')
 
-# Create a reference mapping of known pincode-district pairs
-mapping = df.dropna().drop_duplicates(subset=["pincode", "district"]).set_index("pincode")["district"].to_dict()
+# Step 2: Create a mapping dictionary for each relationship
+# For Pincode to District mapping
+pincode_to_district = {}
+# For District to Pincode mapping
+district_to_pincode = {}
 
-# Fill missing district using pincode
-df["district"] = df.apply(
-    lambda row: mapping.get(row["pincode"], row["district"]) if pd.isna(row["district"]) else row["district"],
-    axis=1
-)
+# Fill the dictionaries with valid pairs (where both pincode and district exist)
+for index, row in df.dropna(subset=['Pincode', 'District']).iterrows():
+    pincode = row['Pincode']
+    district = row['District']
+    pincode_to_district[pincode] = district
+    district_to_pincode[district] = pincode
 
-# Also, create reverse mapping to fill missing pincode using district
-reverse_mapping = df.dropna().drop_duplicates(subset=["district", "pincode"]).set_index("district")["pincode"].to_dict()
+# Step 3: Fill in missing values
+# Fill missing districts based on pincode
+for index, row in df.iterrows():
+    # If pincode exists but district is missing
+    if pd.notna(row['Pincode']) and pd.isna(row['District']):
+        if row['Pincode'] in pincode_to_district:
+            df.at[index, 'District'] = pincode_to_district[row['Pincode']]
+    
+    # If district exists but pincode is missing
+    elif pd.isna(row['Pincode']) and pd.notna(row['District']):
+        if row['District'] in district_to_pincode:
+            df.at[index, 'District'] = district_to_pincode[row['District']]
 
-# Fill missing pincode using district
-df["pincode"] = df.apply(
-    lambda row: reverse_mapping.get(row["district"], row["pincode"]) if pd.isna(row["pincode"]) else row["pincode"],
-    axis=1
-)
+# Step 4: Save the updated dataframe to a new Excel file
+df.to_excel('updated_data.xlsx', index=False)
 
-# Save back to Excel
-df.to_excel("cleaned_file.xlsx", index=False)
+print("Missing values have been filled successfully!")
